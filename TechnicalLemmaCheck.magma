@@ -1,0 +1,234 @@
+//FIRST WE CREATE THE WREATH PRODUCT (S4 x_S4 S4) \wr S_3
+
+S4 := SymmetricGroup(4);
+V4 := Socle(S4);
+Q,pi:= S4/Socle(S4);
+S4dir := DirectProduct(S4,S4);
+
+
+// empty list to be populated with elements of the fibre product S4 x_S3 S4
+S4fibelts := [];
+
+// for each g in S4 x S4, project to each factor
+// then check to see if they agree on the quotient map pi:S4 -> S3
+for g in S4dir do
+	gL := S4 ! ([1,2,3,4]^g);
+	gR := S4 ! [x-4 : x in [5,6,7,8]^g];
+
+	if pi(gL) eq pi(gR) then
+		S4fibelts := S4fibelts cat [g];
+	end if;
+end for;
+
+//create the fibre product S4 x_S3 S4
+S8 := SymmetricGroup(8);
+S4fib :=sub<S8 | S4fibelts>;
+
+//now create the wreath product W = (S4 x_S4 S4) \wr S_3.
+S3 := SymmetricGroup(3);
+W := WreathProduct(S4fib, S3);
+//#W;
+
+
+//COMPUTE SUBGROUPS OF W WITH ORDER A MULTIPLE OF SOME INPUT ARGUMENT 
+// can get all subgroups at once, but this is handy for reducing computational strain 
+subs := Subgroups(W : OrderMultipleOf := 9*(2^10));
+//subs := Subgroups(W : OrderMultipleOf := 9*(2^5));
+G := W;
+
+//GET ALL ELEMENTS OF G=W WHICH STABILIZE THE SETS {1,...,8} AND {9,...,16} 
+//AND {19,...,24} ACTING BY PERMUTATIONS ON {1,...,24}
+//PRIMES WITH Frob = t \in trivS3 ARE PRIMES WHICH SPLIT COMPLETELY IN K_3
+trivS3 := [g : g in G | {1,2,3,4,5,6,7,8} ^ g eq {1,2,3,4,5,6,7,8} and {9,10,11,12,13,14,15,16} ^g eq \
+{9,10,11,12,13,14,15,16} and {17,18,19,20,21,22,23,24}^g eq {17,18,19,20,21,22,23,24} ] ;
+
+//D IS THE SET OF ALL ELEMENTS OF trivS3 WHICH ARE TRIVIAL IN THE FIBRE S3
+//i.e. THOSE ELEMENTS g \in trivS3 FOR WHICH  \pi_fib(g)=1.
+D := [];
+//Q,pi:=S4 / Socle(S4);
+for t in trivS3 do 
+	im := [1,2,3,4]^t;
+	t4 := S4 ! im;
+	if pi(t4) eq Id(Q) then
+		D := D cat [t];
+	end if;
+end for;
+
+//C IS ALL ELEMENTS OF trivS3 WHICH ACT LIKE A TRANSPOSITION IN THE FIBRE PRODUCT COPY OF S3 
+//i.e. THOSE ELEMENTS g \in trivS3 FOR WHICH \pi_fib(g) IS A TRANSPOSITION IN S3
+C := [];
+S4 := SymmetricGroup(4);
+S3 := SymmetricGroup(3);
+Q,pi:=S4 / Socle(S4);
+for t in trivS3 do;
+	im := [1,2,3,4]^t; 
+	t4 := S4 ! im;
+	if Degree(pi(t4)) eq 2 then
+		C := C cat [t];
+	end if;
+end for;
+
+
+//SUPPOSE A  PRIME p SPLITS COMPLETELY IN K_3 AS P_1P_2P_3
+//FOR ELEMENTS t \in trivS3, SUPPOSE Frob_p = t FOR SOME PRIME p. 
+//THIS FUNCTION COMPUTES HOW Frob_{P_i}(L_i/K_3) ACTS  
+FM := function(c)
+	// 1-4 action 
+	c14 := S4 ! [x : x in [1..4]^c];
+	// 5-8 action
+	c58 := S4 ! [x - 4 : x in [5..8]^c];
+	// 9-12 action 
+	c912 := S4 ! [x - 8 : x in [9..12]^c];
+	// 13-16
+	c1316 := S4 ! [x - 12 : x in [13..16]^c];
+	// 17-20
+	c1720 := S4 ! [x - 16 : x in [17..20]^c];
+	// 21-24
+	c2124 := S4 ! [x - 20 : x in [21..24]^c];
+	return Transpose(Matrix([[(Degree(c14)-2)/2,(Degree(c58)-2)/2],[(Degree(c912)-2)/2,(Degree(c1316)-2)/2],[(Degree(c1720)-2)/2,(Degree(c2124)-2)/2]]));
+end function;
+
+
+//MATRICES BELOW ARE POSSIBLE OUTPUTS OF FM(c) WHICH DO NOT HAVE A 2x2 SUBMATRIX IN GL_2(F_2). 
+badFMs := [
+
+Matrix([[0,0,0],[0,0,0]]), 
+Matrix([[1,1,1],[1,1,1]]),
+
+Matrix([[1,1,0],[1,1,0]]),
+Matrix([[1,0,1],[1,0,1]]),
+Matrix([[0,1,1],[0,1,1]]),
+
+Matrix([[1,0,0],[1,0,0]]),
+Matrix([[0,0,1],[0,0,1]]),
+Matrix([[0,1,0],[0,1,0]]),
+
+Matrix([[1,1,1],[0,0,0]]),
+Matrix([[0,0,0],[1,1,1]]),
+
+Matrix([[1,1,0],[0,0,0]]),
+Matrix([[1,0,1],[0,0,0]]),
+Matrix([[0,1,1],[0,0,0]]),
+
+Matrix([[0,0,0],[1,1,0]]),
+Matrix([[0,0,0],[1,0,1]]),
+Matrix([[0,0,0],[0,1,1]]),
+
+
+Matrix([[1,0,0],[0,0,0]]),
+Matrix([[0,1,0],[0,0,0]]),
+Matrix([[0,0,1],[0,0,0]]),
+
+Matrix([[0,0,0],[1,0,0]]),
+Matrix([[0,0,0],[0,1,0]]),
+Matrix([[0,0,0],[0,0,1]])
+];
+
+//FUNCTION TO GET THE ENTRIES OF FM FOR d \in D. COULD USE FM FOR THIS BUT WE DON'T NEED THE MATRIX 
+FMents := function(d)
+	d14 := S4 ! [x : x in [1..4]^d];
+	a11 := d14;
+// 5-8 action
+	d58 := S4 ! [x - 4 : x in [5..8]^d];
+	a21 := d58;
+// 9-12 action 
+	d912 := S4 ! [x - 8 : x in [9..12]^d];
+	a12 := d912;
+// 13-16
+	d1316 := S4 ! [x - 12 : x in [13..16]^d];
+	a22 := d1316;
+// 17-20
+	d1720 := S4 ! [x - 16 : x in [17..20]^d];
+	a13 := d1720;
+// 21-24
+	d2124 := S4 ! [x - 20 : x in [21..24]^d];
+	a23 := d2124;
+	return a11, a12, a13, a21, a22, a23;
+end function;
+
+
+//FIND THE ELEMENTS d \in D WHICH OBEY THE NORM CONDITION OF 
+GoodNormD :=  []; 
+for d in D do
+	a11, a12, a13, a21, a22, a23 := FMents(d);
+	if a11 * a12 * a13 eq Id(V4) and a21 * a22 * a23 eq Id(V4) then 
+		GoodNormD := GoodNormD cat [d];
+	end if;
+end for;
+
+
+//FIND ELEMENTS OF D WHICH OBEY THE coNORM CONDITION [ See (2) of the Lemma]
+GoodNormD :=  []; 
+for d in D do
+	a11, a12, a13, a21, a22, a23 := FMents(d);
+	if a11 * a12 * a13 eq Id(V4) and a21 * a22 * a23 eq Id(V4) then 
+		GoodNormD := GoodNormD cat [d];
+	end if;
+end for;
+
+//THE COMPLEMENT OF GoodNormD IN D
+BadNormD := [d : d in D | d notin GoodNormD];
+
+
+//SAME AS TWO ITEMS ABOVE BUT FOR trivS3 
+GoodNormtrivS3 := [];
+for t in trivS3 do
+	a11, a12, a13, a21, a22, a23 := FMents(t);
+	if a11 * a12 * a13 eq Id(S4) and a21 * a22 * a23 eq Id(S4) then 
+		GoodNormtrivS3 := GoodNormtrivS3 cat [t];
+	end if;
+end for;
+
+BadNormtrivS3 := [t : t in trivS3 | t notin GoodNormtrivS3];
+
+
+//THE NEXT TWO COMMANDS FIND THE ELEMENTS OF C WHICH DON'T ARISE AS ELEMENTS OF Sel_2(E/Q)
+//RECALL THAT THE LEMMA SUPPOSES Sel_2(E/Q)=0
+Ones := Transpose(Matrix([[1,1,1/1]]));
+NoQSelC := [c : c in C | FM(c) * Ones eq Transpose(Matrix([[2,2/1]])) or  
+	FM(c) * Ones eq Transpose(Matrix([[0,0/1]])) or 
+	FM(c) * Ones eq Transpose(Matrix([[0,2/1]])) or FM(c) * Ones eq Transpose(Matrix([[2,0/1]]))];
+
+
+//NoQSelD := [c : c in D | FM(c) * Ones eq Transpose(Matrix([[2,2/1]])) or  
+//	FM(c) * Ones eq Transpose(Matrix([[0,0/1]])) or 
+//	FM(c) * Ones eq Transpose(Matrix([[0,2/1]])) or FM(c) * Ones eq Transpose(Matrix([[2,0/1]]))];
+
+//ELEMENTS OF C CORRESPONDING TO ELEMENTS COMING FROM SELMER GROUP OVER Q
+QSelC := [c : c in C | c notin NoQSelC];
+
+
+
+//#G; #D; #C; #BadNormtrivS3;
+
+
+N := #subs;
+N;
+//FINALLY WE CHECK THAT ALL G_cand < W MEET THE CONDITIONS EXPRESSED IN THE LEMMA
+for e in [1..N] do 
+	if e mod 300 eq 0 then
+		e/N;
+	end if;
+	He := subs[e]`subgroup;
+
+	// make sure H has K3-split primes and a (2)(1) prime in M
+	CH := [h : h in He | h in C];
+	CMeetsH := #CH gt 0;
+
+	// Rule out primes totally split in M with bad "figer matrix"
+	// DH := [h : h in Hd | h in BadNormD];
+	DH := [h : h in He | h in BadNormtrivS3];  //replaced prev line with this
+	HasBadNorm := #DH gt 0;
+
+	// Check for a finger matrix of the right rank
+	HasRk2FM := #[c : c in CH | FM(c) notin badFMs] gt 0;
+
+	//for Hd (H) to be a possible Galois group, H must intersect C and must not violate the norm condition
+	//for an admissible Gal group H to be bad, it must not have any finger matrices with rk=2
+	if CMeetsH eq true and HasRk2FM eq false and HasBadNorm eq false then
+		"Bad admissible galois group", Order(He), e;
+		print "Bad admissible galois group", Order(He), e;
+	end if;
+end for;
+
+print "done";
